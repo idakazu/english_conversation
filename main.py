@@ -56,8 +56,11 @@ if "messages" not in st.session_state:
         return_messages=True
     )
 
-    # モード「日常英会話」用のChain作成
-    st.session_state.chain_basic_conversation = ft.create_chain(ct.SYSTEM_TEMPLATE_BASIC_CONVERSATION)
+    # モード「日常英会話」用のChain作成（初回は仮のレベルで作成）
+    st.session_state.chain_basic_conversation = ft.create_chain(
+        ct.SYSTEM_TEMPLATE_BASIC_CONVERSATION, 
+        english_level="中級者"  # デフォルト値
+    )
 
 # 初期表示
 # col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
@@ -92,9 +95,17 @@ with col3:
         st.session_state.chat_open_flg = False
     st.session_state.pre_mode = st.session_state.mode
 with col4:
+    previous_englv = st.session_state.get('englv', "中級者")
     st.session_state.englv = st.selectbox(label="英語レベル", options=ct.ENGLISH_LEVEL_OPTION, label_visibility="collapsed")
+    
+    # 英語レベルが変更された場合、チェーンを再作成
+    if st.session_state.englv != previous_englv:
+        st.session_state.chain_basic_conversation = ft.create_chain(
+            ct.SYSTEM_TEMPLATE_BASIC_CONVERSATION, 
+            english_level=st.session_state.englv
+        )
 
-with st.chat_message("assistant", avatar="images/ai_icon.jpg"):
+with st.chat_message("assistant", avatar="images/ai_icon.jpg"), st.chat_message("user", avatar="images/user_icon.jpg"), st.chat_message("user", avatar="images/user_icon.jpg"):
     st.markdown("こちらは生成AIによる音声英会話の練習アプリです。何度も繰り返し練習し、英語力をアップさせましょう。")
     st.markdown("**【操作説明】**")
     st.success("""
@@ -138,7 +149,10 @@ if st.session_state.start_flg:
     # 「ディクテーション」ボタン押下時か、「英会話開始」ボタン押下時か、チャット送信時
     if st.session_state.mode == ct.MODE_3 and (st.session_state.dictation_button_flg or st.session_state.dictation_count == 0 or st.session_state.dictation_chat_message):
         if st.session_state.dictation_first_flg:
-            st.session_state.chain_create_problem = ft.create_chain(ct.SYSTEM_TEMPLATE_CREATE_PROBLEM)
+            st.session_state.chain_create_problem = ft.create_chain(
+                ct.SYSTEM_TEMPLATE_CREATE_PROBLEM, 
+                english_level=st.session_state.englv
+            )
             st.session_state.dictation_first_flg = False
         # チャット入力以外
         if not st.session_state.chat_open_flg:
@@ -166,6 +180,7 @@ if st.session_state.start_flg:
             
             with st.spinner('評価結果の生成中...'):
                 system_template = ct.SYSTEM_TEMPLATE_EVALUATION.format(
+                    english_level=st.session_state.englv,
                     llm_text=st.session_state.problem,
                     user_text=st.session_state.dictation_chat_message
                 )
@@ -234,7 +249,10 @@ if st.session_state.start_flg:
     # 「シャドーイング」ボタン押下時か、「英会話開始」ボタン押下時
     if st.session_state.mode == ct.MODE_2 and (st.session_state.shadowing_button_flg or st.session_state.shadowing_count == 0 or st.session_state.shadowing_audio_input_flg):
         if st.session_state.shadowing_first_flg:
-            st.session_state.chain_create_problem = ft.create_chain(ct.SYSTEM_TEMPLATE_CREATE_PROBLEM)
+            st.session_state.chain_create_problem = ft.create_chain(
+                ct.SYSTEM_TEMPLATE_CREATE_PROBLEM, 
+                english_level=st.session_state.englv
+            )
             st.session_state.shadowing_first_flg = False
         
         if not st.session_state.shadowing_audio_input_flg:
@@ -265,6 +283,7 @@ if st.session_state.start_flg:
         with st.spinner('評価結果の生成中...'):
             if st.session_state.shadowing_evaluation_first_flg:
                 system_template = ct.SYSTEM_TEMPLATE_EVALUATION.format(
+                    english_level=st.session_state.englv,
                     llm_text=st.session_state.problem,
                     user_text=audio_input_text
                 )

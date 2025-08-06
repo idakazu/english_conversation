@@ -120,13 +120,22 @@ def play_wav(audio_output_file_path, speed=1.0):
     # LLMからの回答の音声ファイルを削除
     os.remove(audio_output_file_path)
 
-def create_chain(system_template):
+def create_chain(system_template, english_level=None):
     """
     LLMによる回答生成用のChain作成
+    Args:
+        system_template: システムプロンプトのテンプレート
+        english_level: ユーザーの英語レベル（初級者/中級者/上級者）
     """
+    
+    # 英語レベルが指定されている場合はテンプレートに挿入
+    if english_level and "{english_level}" in system_template:
+        formatted_template = system_template.format(english_level=english_level)
+    else:
+        formatted_template = system_template
 
     prompt = ChatPromptTemplate.from_messages([
-        SystemMessage(content=system_template),
+        SystemMessage(content=formatted_template),
         MessagesPlaceholder(variable_name="history"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
@@ -147,14 +156,16 @@ def create_problem_and_play_audio():
         openai_obj: OpenAIのオブジェクト
     """
 
-    # 問題文を生成するChainを実行し、問題文を取得
-    problem = st.session_state.chain_create_problem.predict(input="")
+    # ユーザーの英語レベルに基づいた問題文を生成
+    level_context = f"User level: {st.session_state.englv}. Generate appropriate content."
+    problem = st.session_state.chain_create_problem.predict(input=level_context)
 
     # LLMからの回答を音声データに変換
     llm_response_audio = st.session_state.openai_obj.audio.speech.create(
         model="tts-1",
         voice="alloy",
-        input=problem
+        input=problem,
+        speed=0.9  # 少し遅めで明瞭に発音
     )
 
     # 音声ファイルの作成
@@ -165,6 +176,17 @@ def create_problem_and_play_audio():
     play_wav(audio_output_file_path, st.session_state.speed)
 
     return problem, llm_response_audio
+
+def create_evaluation():
+    """
+    レベル別評価の生成
+    """
+    
+    # ユーザーレベルを考慮した詳細な評価を生成
+    evaluation_input = f"Please provide detailed feedback considering user level: {st.session_state.englv}"
+    llm_response_evaluation = st.session_state.chain_evaluation.predict(input=evaluation_input)
+    
+    return llm_response_evaluation
 
 def create_evaluation():
     """
